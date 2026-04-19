@@ -1,7 +1,7 @@
 //! Utility functions for type conversion, signal generation, math approximations, and plotting.
 
 use crate::core::wdf::WDFloat;
-use rand::Rng;
+use rand::RngExt;
 
 #[cfg(feature = "plot")]
 use plotly::{
@@ -38,10 +38,14 @@ pub fn gain_to_db<T: WDFloat>(lin: T) -> T {
     num_t::<T>(20.0) * lin.log10()
 }
 
-/// Generates `n_samples` random samples in [-1, 1].
 pub fn rand_wave<T: WDFloat>(n_samples: usize) -> Vec<T> {
+    let mut rng = rand::rng();
+
     (0..n_samples)
-        .map(|_| T::from_f64(rand::thread_rng().gen_range(-1.0..=1.0)).unwrap())
+        .map(|_| {
+            let v = rng.random_range(-1.0..=1.0);
+            T::from_f64(v).unwrap()
+        })
         .collect()
 }
 
