@@ -95,7 +95,7 @@ With the `fft` feature, circuits get `get_magnitude_response` and `get_phase_res
 
 ## Safety
 
-All WDF components use `UnsafeCell` for interior mutability — the tree is single-threaded, acyclic, and traversed in a fixed order, making this sound. Validated with Miri: `cargo miri test`.
+All WDF components use `UnsafeCell` for interior mutability — the tree is single-threaded, acyclic, and traversed in a fixed order, making this sound. CI runs `cargo miri test -p wdfrs --all-features`; locally: `cargo miri test -p wdfrs --all-features` (after `rustup component add miri`).
 
 ## C FFI
 
