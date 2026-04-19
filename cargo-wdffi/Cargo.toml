@@ -1,0 +1,13 @@
+[package]
+name = "cargo-wdffi"
+version = "0.1.0"
+edition = "2021"
+description = "Cargo subcommand for wdfrs — generate C headers and build FFI staticlibs"
+publish = false
+license = "MIT"
+
+[[bin]]
+name = "cargo-wdffi"
+path = "src/main.rs"
+
+[dependencies]
