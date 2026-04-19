@@ -99,11 +99,13 @@ pub trait WDFCircuit<T: WDFloat> {
 
     #[cfg(feature = "plot")]
     fn plot_magnitude_response(&mut self, n_samples: usize, fs: T) {
+        self.reset();
         let mag_response: Vec<f64> = self
             .get_magnitude_response(n_samples)
             .iter()
             .map(|x| x.to_f64().unwrap())
             .collect();
+        self.reset();
 
         let title = format!("{} — Magnitude Response", self.circuit_name());
         plot_magnitude_response(&mag_response, fs.to_f64().unwrap(), &title);
@@ -152,11 +154,13 @@ pub trait WDFCircuit<T: WDFloat> {
 
     #[cfg(feature = "plot")]
     fn plot_impulse_response(&mut self, n_samples: usize) {
+        self.reset();
         let impulse_response: Vec<f64> = self
             .get_impulse_response(n_samples)
             .iter()
             .map(|x| x.to_f64().unwrap())
             .collect();
+        self.reset();
 
         let title = format!("{} — Impulse Response", self.circuit_name());
         plot_impulse_response_signal(&impulse_response, &title);
@@ -164,6 +168,7 @@ pub trait WDFCircuit<T: WDFloat> {
 
     #[cfg(feature = "plot")]
     fn plot_transfer_curve(&mut self, input_range: (T, T), n_points: usize, settle_samples: usize) {
+        self.reset();
         let (min_in, max_in) = input_range;
         let step = (max_in - min_in) / num_t(n_points as f64);
 
@@ -192,6 +197,7 @@ pub trait WDFCircuit<T: WDFloat> {
         plot.add_trace(trace);
         plot.set_layout(layout);
         plot.show();
+        self.reset();
     }
 
     /// Implementation provided by derive(WDFCircuit) macro. Calls `reset` on every component in the circuit tree
