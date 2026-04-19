@@ -1,5 +1,7 @@
 # wdfrs
 
+[![CI](https://github.com/gusanthon/wdfrs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gusanthon/wdfrs/actions/workflows/ci.yml?query=branch%3Amain)
+
 A Rust library for real-time analog circuit modeling using Wave Digital Filters.
 
 ## Requirements
