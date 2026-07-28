@@ -123,6 +123,23 @@ pub(crate) fn gen_rtype(name: &Ident, n_ports: usize) -> TokenStream2 {
                 [#(self.#fields.params().rp),*]
             }
 
+            /// Computes just the up-port row of `b = S·a`.
+            ///
+            /// The up port is adapted, so `S[up][up] == 0` and the stale
+            /// `a_waves[up_port]` left over from the previous sample cannot
+            /// contribute to the sum.
+            fn scatter_up(&self) -> T {
+                let n = #np;
+                let s = unsafe { &*self.scatter_mat.get() };
+                let a = unsafe { &*self.a_waves.get() };
+                let off = self.up_port * n;
+                let mut sum = T::zero();
+                for col in 0..n {
+                    unsafe { sum = sum + *s.get_unchecked(off + col) * *a.get_unchecked(col); }
+                }
+                sum
+            }
+
             /// Sets the N×N scattering matrix (row-major, `b = S·a`).
             pub fn set_scattering_matrix(&self, mat: [T; #nsq]) {
                 unsafe { *self.scatter_mat.get() = mat; }
@@ -165,7 +182,8 @@ pub(crate) fn gen_rtype(name: &Ident, n_ports: usize) -> TokenStream2 {
             fn get_reflected_wave(&self) -> T {
                 let mut _port = 0usize;
                 #(#get_reflected)*
-                let b_val = unsafe { (*self.b_waves.get())[self.up_port] };
+                let b_val = self.scatter_up();
+                unsafe { (*self.b_waves.get())[self.up_port] = b_val; }
                 self.params_mut().b = b_val;
                 b_val
             }
