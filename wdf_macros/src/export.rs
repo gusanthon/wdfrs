@@ -7,7 +7,7 @@ use syn::{
 };
 
 pub(crate) struct ExportWdf {
-    pub circuit: Option<Ident>,
+    pub circuit: Option<Type>,
     pub prefix: Option<Ident>,
     pub constructor: ExprClosure,
     pub precision: Type,
@@ -16,7 +16,7 @@ pub(crate) struct ExportWdf {
 
 impl Parse for ExportWdf {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut circuit: Option<Ident> = None;
+        let mut circuit: Option<Type> = None;
         let mut prefix: Option<Ident> = None;
         let mut constructor: Option<ExprClosure> = None;
         let mut precision: Option<Type> = None;
@@ -65,7 +65,7 @@ impl Parse for ExportWdf {
 }
 
 pub(crate) fn export_wdf_impl(
-    circuit: Option<Ident>,
+    circuit: Option<Type>,
     prefix: Option<Ident>,
     constructor: ExprClosure,
     precision: Type,
@@ -81,15 +81,50 @@ pub(crate) fn export_wdf_impl(
         .unwrap_or_default();
 
     let prefix = prefix.unwrap_or_else(|| format_ident!("{}", derive_prefix(&fn_name_str)));
-    let struct_name = match circuit {
-        Some(n) => n,
+    let circuit_ty = match circuit {
+        Some(t) => t,
         None => {
             return syn::Error::new(proc_macro2::Span::call_site(), "missing `circuit`")
                 .to_compile_error()
         }
     };
 
-    let trait_name = format_ident!("{}{}FfiTrait", struct_name, prec_upper);
+    // `circuit` takes either a bare name (`DiodeClipper`), which is assumed to
+    // be the usual `<T, R>` circuit shape and gets an impl generic over the
+    // root; or a type with its arguments already applied (`MyCircuit<f32>`),
+    // for a circuit that names its root concretely — one owning several trees,
+    // say, with no single root to leave generic.
+    //
+    // Which of the two is meant is read off the spelling, not the type: a
+    // circuit generic over `T` alone still has to be written `MyCircuit<f32>`.
+    let Some((base_name, root_is_generic)) = circuit_shape(&circuit_ty) else {
+        return syn::Error::new_spanned(
+            &circuit_ty,
+            "`circuit` must be a path type, e.g. `DiodeClipper` or `MyCircuit<f32>`",
+        )
+        .to_compile_error();
+    };
+
+    let trait_name = format_ident!("{}{}FfiTrait", base_name, prec_upper);
+
+    // Where the impl and the method signature checks get their generics.
+    let (impl_generics, self_ty, check_generics, check_ty, check_val) = if root_is_generic {
+        (
+            quote! { <R: #rwdf::core::wdf::RootWDF<#precision>> },
+            quote! { #circuit_ty<#precision, R> },
+            quote! { <T: #rwdf::core::wdf::WDFloat, R: #rwdf::core::wdf::RootWDF<T>> },
+            quote! { #circuit_ty<T, R> },
+            quote! { T },
+        )
+    } else {
+        (
+            quote! {},
+            quote! { #circuit_ty },
+            quote! {},
+            quote! { #circuit_ty },
+            quote! { #precision },
+        )
+    };
     let circuit_type = format_ident!("__{}_{}__Circuit", prefix, prec_str);
     let build_fn = format_ident!("__{}_{}_build", prefix, prec_str);
     let new_fn = format_ident!("{}_{}_new", prefix, prec_str);
@@ -120,10 +155,8 @@ pub(crate) fn export_wdf_impl(
     let method_checks = methods.iter().map(|m| {
         quote! {
             const _: () = {
-                fn __check_method<T: #rwdf::core::wdf::WDFloat, R: #rwdf::core::wdf::RootWDF<T>>(
-                    s: &mut #struct_name<T, R>
-                ) {
-                    let _: fn(&mut #struct_name<T, R>, T) = |s, v| s.#m(v);
+                fn __check_method #check_generics (s: &mut #check_ty) {
+                    let _: fn(&mut #check_ty, #check_val) = |s, v| s.#m(v);
                 }
             };
         }
@@ -136,9 +169,7 @@ pub(crate) fn export_wdf_impl(
             #( #method_trait_fns )*
         }
 
-        impl<R: #rwdf::core::wdf::RootWDF<#precision>> #trait_name
-            for #struct_name<#precision, R>
-        {
+        impl #impl_generics #trait_name for #self_ty {
             #( #method_impls )*
         }
 
@@ -188,6 +219,18 @@ pub(crate) fn export_wdf_impl(
             }
         }
     }
+}
+
+/// Splits the `circuit` type into its base name and whether the root is still
+/// generic — that is, whether the caller left the type's arguments off.
+///
+/// Returns `None` for anything that is not a path type.
+fn circuit_shape(ty: &Type) -> Option<(Ident, bool)> {
+    let Type::Path(tp) = ty else { return None };
+    let segment = tp.path.segments.last()?;
+    let root_is_generic = matches!(segment.arguments, syn::PathArguments::None);
+
+    Some((segment.ident.clone(), root_is_generic))
 }
 
 fn extract_args(closure: &ExprClosure) -> Vec<Ident> {
