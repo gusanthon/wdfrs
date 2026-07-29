@@ -269,8 +269,13 @@ pub trait RootWDF<T: WDFloat>: WDF<T> {
         self.next().walk_children(f);
     }
 
+    /// Retunes the whole tree, root included.
+    ///
+    /// Every root's `set_sample_rate` walks its subtree before recomputing its
+    /// own impedance, so one call covers the tree: the root re-adopts from
+    /// children that already hold the new rate.
     fn set_tree_sample_rate(&self, fs: T) {
-        self.next().set_sample_rate(fs);
+        self.set_sample_rate(fs);
     }
 
     fn reset_tree(&self)

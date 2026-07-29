@@ -84,6 +84,13 @@ where
         i.params.g = next_g;
     }
 
+    /// Retune the subtree first, then re-adopt: the impedance this root takes on
+    /// is only meaningful once its children hold the new rate.
+    fn set_sample_rate(&self, fs: T) {
+        self.next.set_sample_rate(fs);
+        self.calc_impedance();
+    }
+
     /// For an ideal source, $b = 2 \cdot V - a$.
     fn get_reflected_wave(&self) -> T {
         let i = self.inner_mut();
