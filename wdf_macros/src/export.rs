@@ -189,11 +189,11 @@ pub(crate) fn export_wdf_impl(
         }
 
         #[allow(non_camel_case_types)]
-        type #circuit_type = impl #trait_name;
+        #circuit_alias
 
         #[allow(non_snake_case)]
         #[allow(clippy::redundant_closure)]
-        #[define_opaque(#circuit_type)]
+        #define_opaque
         fn #build_fn(#( #args: #precision, )*) -> Box<#circuit_type> {
             (#constructor)(#( #args, )*)
         }
@@ -207,7 +207,7 @@ pub(crate) fn export_wdf_impl(
         #[no_mangle]
         pub unsafe extern "C" fn #process_fn(ptr: *mut (), input: #precision) -> #precision {
             let f = &mut *(ptr as *mut #circuit_type);
-            f.process(input)
+            #rwdf::core::circuit::WDFCircuit::process(f, input)
         }
 
         #[no_mangle]
@@ -221,7 +221,7 @@ pub(crate) fn export_wdf_impl(
             let input = ::core::slice::from_raw_parts(input, len);
             let output = ::core::slice::from_raw_parts_mut(output, len);
             for i in 0..len {
-                output[i] = f.process(input[i]);
+                output[i] = #rwdf::core::circuit::WDFCircuit::process(f, input[i]);
             }
         }
 
