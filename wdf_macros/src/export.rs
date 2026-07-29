@@ -127,6 +127,21 @@ pub(crate) fn export_wdf_impl(
     };
     let circuit_type = format_ident!("__{}_{}__Circuit", prefix, prec_str);
     let build_fn = format_ident!("__{}_{}_build", prefix, prec_str);
+
+    // The alias only has to be opaque when the root is still generic: there is
+    // no way to spell `#circuit_ty<#precision, R>` for the `R` the constructor
+    // picked. With the arguments applied the type is already nameable, so the
+    // alias is an ordinary one and the consumer needs no `type_alias_impl_trait`
+    // on account of this macro.
+    let (circuit_alias, define_opaque) = if root_is_generic {
+        (
+            quote! { type #circuit_type = impl #trait_name; },
+            quote! { #[define_opaque(#circuit_type)] },
+        )
+    } else {
+        (quote! { type #circuit_type = #circuit_ty; }, quote! {})
+    };
+
     let new_fn = format_ident!("{}_{}_new", prefix, prec_str);
     let process_fn = format_ident!("{}_{}_process", prefix, prec_str);
     let process_block_fn = format_ident!("{}_{}_process_block", prefix, prec_str);
