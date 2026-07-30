@@ -1,9 +1,9 @@
 //! The C ABI `export_wdf!` generates, exercised from outside the crate that
 //! defines the circuits — which is what a consumer does.
 //!
-//! Both accepted spellings of `circuit:` are covered: a bare name, for the
-//! usual circuit generic over its root, and a name with its arguments applied,
-//! for a circuit that names its root concretely.
+//! All three spellings of `circuit:` are covered: a `_` for the root the
+//! constructor picked, a fully applied type for a circuit that names its root
+//! itself, and a bare name for a circuit with no generics at all.
 
 #![feature(type_alias_impl_trait)]
 
@@ -15,8 +15,8 @@ use wdfrs::export_wdf;
 
 // ── circuit: applied type ────────────────────────────────────────────────────
 
-/// A circuit that owns a concrete root, so there is no `R` left to be generic
-/// over and `circuit: Rc1<f32>` is the only way to name it.
+/// A circuit that owns a concrete root, so there is no root left to stand in
+/// for and the type is written out in full: `circuit: Rc1<f32>`.
 pub struct Rc1<T: WDFloat> {
     root: IdealVoltageSource<T, SeriesAdaptor<T, Resistor<T>, Capacitor<T>>>,
     gain: T,
@@ -80,14 +80,14 @@ fn applied_circuit_type() {
     }
 }
 
-// ── circuit: bare name ───────────────────────────────────────────────────────
+// ── circuit: root left to `_` ────────────────────────────────────────────────
 
-// The README's example verbatim. The circuit is generic over its root, and the
-// constructor hands back an opaque one, so this also checks that the impl the
-// macro writes still applies through a `type … = impl RootWDF<T>` alias from
-// another crate.
+// The README's example verbatim. The constructor hands back a root nothing can
+// name, so `_` stands in for it, and this also checks that the impl the macro
+// writes still applies through a `type … = impl RootWDF<T>` alias from another
+// crate.
 export_wdf! {
-    circuit: DiodeClipper,
+    circuit: DiodeClipper<f32, _>,
     prefix: dc,
     constructor: |fs, cutoff, gain| new_diode_clipper(fs, cutoff, gain),
     precision: f32,
@@ -105,5 +105,54 @@ fn generic_root_circuit_type() {
         assert!(dc_f32_process(c, 0.5).is_finite());
 
         dc_f32_free(c);
+    }
+}
+
+// ── circuit: bare name ───────────────────────────────────────────────────────
+
+// A series RC with no generic parameters at all — precision baked in. There is
+// nothing to apply and no root to stand in for, so the bare name is the type.
+pub struct RcBare {
+    root: IdealVoltageSource<f32, SeriesAdaptor<f32, Resistor<f32>, Capacitor<f32>>>,
+}
+
+impl WDFCircuit<f32> for RcBare {
+    fn process(&mut self, sample: f32) -> f32 {
+        self.root.set_voltage(sample);
+        self.root.compute();
+        self.root.next.p2.wave_to_voltage()
+    }
+}
+
+pub fn new_rc_bare(fs: f32) -> Box<RcBare> {
+    Box::new(RcBare {
+        root: IdealVoltageSource::new(SeriesAdaptor::new(
+            Resistor::new(num_t(2.2e3)),
+            Capacitor::new(num_t(100e-9), fs),
+        )),
+    })
+}
+
+export_wdf! {
+    circuit: RcBare,
+    prefix: rcbare,
+    constructor: |fs| new_rc_bare(fs),
+    precision: f32,
+    methods: [],
+}
+
+#[test]
+fn concrete_zero_generic_circuit_type() {
+    unsafe {
+        let c = rcbare_f32_new(48e3);
+        assert!(!c.is_null());
+        assert!(rcbare_f32_process(c, 1.0).is_finite());
+
+        let mut buf = [1.0_f32; 4];
+        let p = buf.as_mut_ptr();
+        rcbare_f32_process_block(c, p as *const f32, p, buf.len());
+        assert!(buf.iter().all(|v| v.is_finite()));
+
+        rcbare_f32_free(c);
     }
 }
