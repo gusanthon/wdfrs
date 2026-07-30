@@ -218,10 +218,13 @@ pub(crate) fn export_wdf_impl(
             len: usize,
         ) {
             let f = &mut *(ptr as *mut #circuit_type);
-            let input = ::core::slice::from_raw_parts(input, len);
-            let output = ::core::slice::from_raw_parts_mut(output, len);
+            // Read and write through the raw pointers directly. Hosts routinely
+            // pass the same buffer as input and output, and a `&[T]` plus a
+            // `&mut [T]` over the same block alias. Reading each sample before
+            // writing its slot keeps in-place processing correct.
             for i in 0..len {
-                output[i] = #rwdf::core::circuit::WDFCircuit::process(f, input[i]);
+                let x = *input.add(i);
+                *output.add(i) = #rwdf::core::circuit::WDFCircuit::process(f, x);
             }
         }
 

@@ -68,6 +68,14 @@ fn applied_circuit_type() {
         rc1_f32_process_block(c, input.as_ptr(), output.as_mut_ptr(), input.len());
         assert!(output.iter().all(|v| v.is_finite()));
 
+        // In place: hosts routinely pass one buffer as both input and output.
+        // The C ABI must read each sample before overwriting its slot, and must
+        // not form aliasing slices over the block, Miri guards the latter.
+        let mut buf = [1.0_f32; 8];
+        let p = buf.as_mut_ptr();
+        rc1_f32_process_block(c, p as *const f32, p, buf.len());
+        assert!(buf.iter().all(|v| v.is_finite()));
+
         rc1_f32_free(c);
     }
 }
