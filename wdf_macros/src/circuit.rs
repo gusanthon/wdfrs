@@ -18,7 +18,7 @@ pub(crate) fn derive_wdf_circuit_impl(input: DeriveInput) -> TokenStream2 {
     let voltage_outputs = find_fields_with_attr(&input.data, "wdf_v_output");
     let current_outputs = find_fields_with_attr(&input.data, "wdf_i_output");
     let handle_inits = generate_handle_inits(&input.data, &root_field);
-    let ft = get_float_type(&input.generics);
+    let ft = get_float_type(&input.generics, &input.data);
 
     let field_inits = if let Data::Struct(ds) = &input.data {
         ds.fields
@@ -158,7 +158,7 @@ fn is_handle_type(ty: &Type) -> bool {
     false
 }
 
-pub(crate) fn get_float_type(generics: &syn::Generics) -> TokenStream2 {
+pub(crate) fn get_float_type(generics: &syn::Generics, data: &Data) -> TokenStream2 {
     for param in &generics.params {
         if let syn::GenericParam::Type(type_param) = param {
             let ident = &type_param.ident;
@@ -186,8 +186,37 @@ pub(crate) fn get_float_type(generics: &syn::Generics) -> TokenStream2 {
             }
         }
     }
-    // Fallback if no generic is found
+
+    // Case 3: no generic float — a precision-hardcoded circuit. Every handle
+    // names its float as its first type argument (`ResVSHandle<f32>`,
+    // `WDFHandle<f32, W>`), so read it off the first handle field.
+    if let Some(ty) = float_from_handle_field(data) {
+        return quote! { #ty };
+    }
+
+    // No handle to read and no generic: default to f64, which is correct for a
+    // circuit whose components are themselves f64.
     quote! { f64 }
+}
+
+/// The float type of the first handle field, if any — its first type argument.
+fn float_from_handle_field(data: &Data) -> Option<Type> {
+    let Data::Struct(ds) = data else { return None };
+    for field in &ds.fields {
+        if !is_handle_type(&field.ty) {
+            continue;
+        }
+        if let Type::Path(tp) = &field.ty {
+            if let Some(seg) = tp.path.segments.last() {
+                if let syn::PathArguments::AngleBracketed(ab) = &seg.arguments {
+                    if let Some(syn::GenericArgument::Type(ty)) = ab.args.first() {
+                        return Some(ty.clone());
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 fn find_field_with_attr(data: &Data, attr_name: &str) -> Option<Ident> {

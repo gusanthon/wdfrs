@@ -8,10 +8,10 @@
 #![feature(type_alias_impl_trait)]
 
 use wdfrs::circuits::diode_clipper::{new_diode_clipper, DiodeClipper};
-use wdfrs::core::circuit::WDFCircuit;
 use wdfrs::core::utils::num_t;
 use wdfrs::core::wdf::*;
-use wdfrs::export_wdf;
+// `WDFCircuit` is both the trait and the derive macro, re-exported together.
+use wdfrs::{export_wdf, WDFCircuit};
 
 // ── circuit: applied type ────────────────────────────────────────────────────
 
@@ -155,4 +155,51 @@ fn concrete_zero_generic_circuit_type() {
 
         rcbare_f32_free(c);
     }
+}
+
+// ── derive on a zero-generic circuit ─────────────────────────────────────────
+
+// With no generic to read the float from, the derive takes it off the first
+// handle field (`ResVSHandle<f32>`), so a precision-hardcoded circuit can still
+// use `#[derive(WDFCircuit)]` for its handles, `from_root` and
+// `set_sample_rate`.
+//
+// The circuit itself is only scaffolding for that: a series RC, the source's
+// 1 k output impedance and a 1 uF cap, closed at the root by an ideal voltage
+// source left at its default 0 V — which is to say a short. Output is the cap
+// voltage.
+pub type RcF32Root = impl RootWDF<f32>;
+
+#[derive(WDFCircuit)]
+pub struct RcF32 {
+    rvs: ResVSHandle<f32>,
+    cap: CapHandle<f32>,
+    #[wdf_root]
+    root: WDFRoot<RcF32Root>,
+}
+
+impl WDFCircuit<f32> for RcF32 {
+    fn process(&mut self, sample: f32) -> f32 {
+        self.rvs.set_voltage(sample);
+        self.root.compute();
+        self.cap.wave_to_voltage()
+    }
+}
+
+#[define_opaque(RcF32Root)]
+pub fn new_rc_f32(fs: f32) -> Box<RcF32> {
+    let rvs = ResistiveVoltageSource::new(num_t(1e3)).id("rvs");
+    let cap = Capacitor::new(num_t(1e-6), fs).id("cap");
+    RcF32::from_root(rvs.series_with(cap).to_ideal_voltage_source())
+}
+
+#[test]
+fn derive_infers_float_on_zero_generic_circuit() {
+    let mut c = new_rc_f32(48e3);
+    assert!(c.process(1.0).is_finite());
+    // The real assertion is that this line compiles: before the handle-field
+    // fallback the derive gave `set_sample_rate` an `f64` parameter, which no
+    // `f32` tree accepts.
+    c.set_sample_rate(96e3);
+    assert!(c.process(1.0).is_finite());
 }
