@@ -6,13 +6,15 @@ mod circuit;
 mod export;
 mod rtype;
 
-/// Returns a token stream for the root path of the `wdfrs` crate,
-/// whether the macro is invoked from inside wdfrs itself (`crate`) or
-/// from an external crate (`::wdfrs`).
+/// Returns a token stream for the root path of the `wdfrs` crate. Always spells it
+/// `::wdfrs` — resolvable from wdfrs itself via the `extern crate self as wdfrs`
+/// alias in `lib.rs`, and from any downstream crate. `FoundCrate::Itself` also covers
+/// examples/tests/benches *inside* the wdfrs package, where a bare `crate` would wrongly
+/// point at the example/test crate rather than the library.
 pub(crate) fn wdfrs_crate() -> TokenStream2 {
     use proc_macro_crate::{crate_name, FoundCrate};
     match crate_name("wdfrs") {
-        Ok(FoundCrate::Itself) => quote::quote!(crate),
+        Ok(FoundCrate::Itself) => quote::quote!(::wdfrs),
         Ok(FoundCrate::Name(name)) => {
             let ident = proc_macro2::Ident::new(&name, proc_macro2::Span::call_site());
             quote::quote!(::#ident)

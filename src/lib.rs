@@ -1,6 +1,10 @@
 #![feature(type_alias_impl_trait)]
 #![doc = include_str!("../README.md")]
 
+// Let macro-generated code refer to this crate as `::wdfrs`, so the derive emits one
+// path that resolves both here and in in-package examples/tests/benches.
+extern crate self as wdfrs;
+
 pub mod circuits;
 
 #[allow(clippy::mut_from_ref)]
