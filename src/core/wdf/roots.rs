@@ -158,9 +158,18 @@ impl<T: WDFloat, N: WDF<T>> WDF<T> for IdealCurrentSource<T, N> {
         unsafe { &mut (*self.inner.get()).params }
     }
 
+    /// An ideal source adopts the impedance of the connected subtree. Retune the
+    /// children first so a change to a descendant reaches the source instead of
+    /// leaving `two_r` on a stale subtree.
     fn calc_impedance(&self) {
+        self.next.calc_impedance();
+        let next_rp = self.next.params().rp;
+        let next_g = self.next.params().g;
+
         let i = self.inner_mut();
-        i.two_r = num_t::<T>(2.0) * self.next.params().rp;
+        i.params.rp = next_rp;
+        i.params.g = next_g;
+        i.two_r = num_t::<T>(2.0) * next_rp;
         i.two_r_i_s = i.two_r * i.i_s;
     }
 
@@ -302,5 +311,32 @@ impl<T: WDFloat, N: WDF<T>> WDF<T> for Switch<T, N> {
     fn set_sample_rate(&self, fs: T) {
         self.next.set_sample_rate(fs);
         self.calc_impedance();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::core::wdf::*;
+
+    #[test]
+    fn current_source_reimpedances_after_descendant_change() {
+        // ICS ─ Series(R1 = 1, R2 = 1): subtree rp = 2, so b = 2·rp·i_s = 4 at i_s = 1.
+        let root = Resistor::new(1.0_f64)
+            .series_with(Resistor::new(1.0))
+            .to_ideal_current_source();
+        root.set_current(1.0);
+        assert_eq!(root.get_reflected_wave(), 4.0);
+
+        // Change an interior leaf: subtree rp 2 → 3. The source must re-adopt to b = 6;
+        // without recursing in calc_impedance it stays on the stale 4.
+        root.next.p1.set_resistance(2.0);
+        root.calc_impedance();
+        assert_eq!(root.get_reflected_wave(), 6.0);
+
+        // The port impedance is adopted too, as the voltage source does. Left at
+        // the default 0 it divides by zero for anything reading the root port.
+        assert_eq!(root.params().rp, 3.0);
+        assert_eq!(root.params().g, 1.0 / 3.0);
+        assert!(root.wave_to_current().is_finite());
     }
 }
