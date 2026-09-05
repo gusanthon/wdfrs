@@ -19,14 +19,22 @@ pub type RCLowPassCircuit<T> = Box<RCLowPass<T, IdealVoltageSource<T, SeriesAdap
 pub type RCLowPassCircuit<T: WDFloat> = Box<RCLowPass<T, impl RootWDF<T>>>;
 ```
 
-A `rust-toolchain.toml` is included, so `cargo` will pick up the correct nightly automatically.
+A `rust-toolchain.toml` is included, so `cargo` will pick up the correct nightly automatically. It
+resolves from the working directory rather than the manifest, so run cargo from the crate root,
+`cargo build --manifest-path …` from elsewhere selects a different toolchain and fails.
+
+TAIT reaches consumers too, since the aliases are public API: a crate that writes one of its own,
+or that exports a circuit whose root is left to `_` through `export_wdf!`, needs
+`#![feature(type_alias_impl_trait)]` in its own crate root and a nightly compatible with this
+repo's pin.
 
 ## Components
 
 - `Resistor`, `Capacitor`, `Inductor`
 - `IdealVoltageSource`, `IdealCurrentSource`, `ResistiveVoltageSource`
 - `SeriesAdaptor`, `ParallelAdaptor`, `PolarityInverter`
-- `RType3Port` through `RType8Port`, with macros for n-port R-type adaptors
+- `RType4Port` through `RType8Port`, `RootRType4Port` through `RootRType6Port`,
+  with `define_rtype!` / `define_root_rtype!` for other port counts
 - `ResistorCapacitorSeries`, `ResistorCapacitorParallel`
 - `Diode`, `DiodePair` (Lambert W approximation)
 - Fluent builder API: `.series_with()`, `.parallel_with()`, `.id()`
@@ -105,7 +113,7 @@ Use `export_wdf!` to expose a circuit to C, then `cargo wdffi` to build the stat
 
 ```rust
 export_wdf! {
-    circuit: DiodeClipper,
+    circuit: DiodeClipper<f32, _>,
     prefix: dc,
     constructor: |fs, cutoff, gain| new_diode_clipper(fs, cutoff, gain),
     precision: f32,
@@ -117,6 +125,15 @@ export_wdf! {
 cargo install --path path/to/wdfrs/cargo-wdffi  # requires cargo-expand and cbindgen
 cargo wdffi myfilter.h
 ```
+
+`circuit` is the type as Rust spells it, with `_` standing for the root the constructor picked —
+`new_diode_clipper` returns `Box<DiodeClipper<T, impl RootWDF<T>>>`, and nothing can name that root,
+so `_` holds its place. A circuit that names its root itself, like one owning several trees, has
+nothing to stand in for and is written out in full, `circuit: MyCircuit<f32>`; a circuit with no
+generics at all is a bare `circuit: MyCircuit`.
+
+Only the `_` form needs `#![feature(type_alias_impl_trait)]` in the exporting crate. The other two
+name a type the alias can spell outright.
 
 ## Performance
 
