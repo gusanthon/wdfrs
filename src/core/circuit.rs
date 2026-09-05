@@ -62,6 +62,8 @@ pub trait WDFCircuit<T: WDFloat> {
 
     /// Calculates the impulse response of the circuit.
     fn get_impulse_response(&mut self, n_samples: usize) -> Vec<T> {
+        self.reset();
+
         let mut impulse = vec![T::zero(); n_samples];
         impulse[0] = T::one();
 
