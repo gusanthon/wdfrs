@@ -285,10 +285,33 @@ fn constructor_name(closure: &ExprClosure) -> Option<Ident> {
     None
 }
 
+/// The FFI prefix taken from a constructor name: one initial per underscored
+/// word, with the `new_` verb dropped so the prefix names the circuit rather
+/// than the fact that it is a constructor — `new_diode_clipper` gives `dc`.
 pub(crate) fn derive_prefix(name: &str) -> String {
-    let stripped = name.strip_prefix("build_").unwrap_or(name);
+    let stripped = name.strip_prefix("new_").unwrap_or(name);
     stripped
         .split('_')
         .filter_map(|w| w.chars().next())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::derive_prefix;
+
+    #[test]
+    fn prefix_drops_the_constructor_verb() {
+        // `dc` is what the README writes by hand for this circuit; keeping the
+        // verb would give `ndc`.
+        assert_eq!(derive_prefix("new_diode_clipper"), "dc");
+        assert_eq!(derive_prefix("new_bassman_tone_stack"), "bts");
+
+        // One initial per underscored word, so a single-word name gives one
+        // letter whether or not it carries digits.
+        assert_eq!(derive_prefix("new_lpf2"), "l");
+
+        // A name with no verb to drop keeps every initial.
+        assert_eq!(derive_prefix("diode_clipper"), "dc");
+    }
 }
