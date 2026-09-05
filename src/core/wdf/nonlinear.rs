@@ -56,7 +56,6 @@ impl<T: WDFloat, N: WDF<T>> Diode<T, N> {
         let d = Self {
             next,
             inner: DiodeInternal {
-                params: Default::default(),
                 i_s,
                 v_t,
                 one_over_vt: T::one() / v_t,
@@ -143,7 +142,6 @@ struct DiodePairInternal<T: WDFloat> {
     is: T,
     vt: T,
     one_over_vt: T,
-    two_r_is: T,
     r_is_over_vt: T,
     log_r_is_over_vt: T,
 }
@@ -212,7 +210,6 @@ impl<T: WDFloat, N: WDF<T>> WDF<T> for DiodePair<T, N> {
         let next_rp = self.next.params().rp;
         let i = self.inner_mut();
 
-        i.two_r_is = num_t::<T>(2.0) * next_rp * i.is;
         i.r_is_over_vt = next_rp * i.is * i.one_over_vt;
         i.log_r_is_over_vt = i.r_is_over_vt.ln();
 

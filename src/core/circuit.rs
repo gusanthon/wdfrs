@@ -24,15 +24,7 @@ pub trait WDFCircuit<T: WDFloat> {
     fn process(&mut self, sample: T) -> T;
 
     fn circuit_name(&self) -> String {
-        let full_type = std::any::type_name::<Self>();
-        full_type
-            .split('<')
-            .next()
-            .unwrap_or(full_type)
-            .split("::")
-            .last()
-            .unwrap_or(full_type)
-            .into()
+        crate::core::utils::type_of::<Self>()
     }
 
     /// Benchmarks the circuit's processing speed.

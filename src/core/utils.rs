@@ -11,7 +11,7 @@ use plotly::{
 };
 
 /// Returns the short name of a type (without generic parameters or path).
-pub fn type_of<T>() -> String {
+pub fn type_of<T: ?Sized>() -> String {
     let full_type = std::any::type_name::<T>();
     full_type
         .split('<')

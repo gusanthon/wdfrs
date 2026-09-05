@@ -28,7 +28,6 @@ pub fn new_diode_clipper<T: WDFloat>(
     let p1 = rvs.parallel_with(Capacitor::new(num_t(47e-9), fs).id("c1"));
 
     let root = DiodePair::new(p1, num_t(2.52e-9));
-    root.set_diode_params(num_t(2.52e-9), num_t(25.85e-3));
 
     let mut dc = DiodeClipper::from_root(root);
     dc.set_input_gain(input_gain_db);
