@@ -103,9 +103,7 @@ impl<T: WDFloat, N: WDF<T>> WDF<T> for Diode<T, N> {
 
     /// Calculates reflection using the Lambert W approximation.
     fn get_reflected_wave(&self) -> T {
-        let next_b = self.next.get_reflected_wave();
         let i = self.inner_mut();
-        i.params.a = next_b;
 
         let offset = i.log_r_is_over_vt + i.params.a * i.one_over_vt + i.r_is_over_vt;
         i.params.b = i.params.a + i.two_r_is - (num_t::<T>(2.0) * i.v_t) * omega_approx(offset);
@@ -115,7 +113,6 @@ impl<T: WDFloat, N: WDF<T>> WDF<T> for Diode<T, N> {
 
     fn set_incident_wave(&self, a: T) {
         self.inner_mut().params.a = a;
-        self.next.set_incident_wave(a);
     }
 
     fn recurse_print(&self, prefix: &str) {
@@ -131,6 +128,13 @@ impl<T: WDFloat, N: WDF<T>> WDF<T> for Diode<T, N> {
             child.set_sample_rate(fs);
         });
         self.calc_impedance();
+    }
+
+    fn find_by_id_ptr(&self, id: &str) -> Option<NonNull<dyn Any>> {
+        if self.params().id == Some(id) {
+            return NonNull::new(self as *const Self as *mut Self as *mut dyn Any);
+        }
+        self.next.find_by_id_ptr(id)
     }
 }
 
@@ -220,9 +224,7 @@ impl<T: WDFloat, N: WDF<T>> WDF<T> for DiodePair<T, N> {
 
     /// Calculates reflection for the anti-parallel pair using the Lambert W approximation.
     fn get_reflected_wave(&self) -> T {
-        let next_b = self.next.get_reflected_wave();
         let i = self.inner_mut();
-        i.params.a = next_b;
 
         let lam = i.params.a.signum();
         let lam_a_over_vt = lam * i.params.a * i.one_over_vt;
