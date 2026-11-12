@@ -608,4 +608,11 @@ impl<T: WDFloat> WDF<T> for CapacitiveVoltageSource<T> {
         i.params.a = a;
         i.z = i.params.a;
     }
+
+    fn reset(&self) {
+        let i = self.inner_mut();
+        i.z = T::zero();
+        i.v0 = T::zero();
+        i.v1 = T::zero();
+    }
 }
