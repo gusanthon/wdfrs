@@ -127,6 +127,7 @@ where
 
 //====================================================================================
 
+#[derive(Default)]
 struct ParAdapInternal<T: WDFloat> {
     pub params: WDFParams<T>,
     pub p1_reflect: T,
@@ -161,13 +162,7 @@ where
         let p = Self {
             p1,
             p2,
-            inner: ParAdapInternal {
-                params: WDFParams::default(),
-                p1_reflect: T::zero(),
-                b_diff: T::zero(),
-                b_temp: T::zero(),
-            }
-            .into(),
+            inner: ParAdapInternal::default().into(),
         };
         p.calc_impedance();
         p

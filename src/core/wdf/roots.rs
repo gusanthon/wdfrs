@@ -283,17 +283,13 @@ impl<T: WDFloat, N: WDF<T>> WDF<T> for Switch<T, N> {
 
     /// Reflects waves back into the connected subtree based on switch state.
     fn get_reflected_wave(&self) -> T {
-        let b_next = self.next.get_reflected_wave();
         let i = self.inner_mut();
-
-        i.params.b = if i.closed { -b_next } else { b_next };
+        i.params.b = if i.closed { -i.params.a } else { i.params.a };
         i.params.b
     }
 
     fn set_incident_wave(&self, a: T) {
-        let i = self.inner_mut();
-        i.params.a = a;
-        self.next.set_incident_wave(if i.closed { -a } else { a });
+        self.inner_mut().params.a = a;
     }
 
     fn find_by_id_ptr(&self, id: &str) -> Option<NonNull<dyn Any>> {
